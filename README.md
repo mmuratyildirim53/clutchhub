@@ -16,7 +16,7 @@ Windows, Node.js 22+, npm ve .NET 9 SDK gerekir. Depo kökünde PowerShell ile:
 
 ```powershell
 npm ci
-dotnet publish native/Keys/Clutchub.Keys.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:Product=ClutchHub -p:Version=0.4.0.0
+dotnet publish native/Keys/Clutchub.Keys.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:IncludeSourceRevisionInInformationalVersion=false -p:Product=ClutchHub -p:Version=1.0.0.0
 npm run check
 npm start
 ```
@@ -25,21 +25,21 @@ Kurulum paketi üretmek için `npm run build:win` çalıştırın. Çıktı `dis
 
 ## Windows kurulumu
 
-Yayımlanan sürümler için GitHub **Releases** sayfasındaki `ClutchHub-Setup-<sürüm>.exe` dosyasını indirin ve çalıştırın. Kurulumda hedef klasörü seçebilirsiniz; masaüstü kısayolu oluşturulur. Uygulamayı açıp bir kullanıcı adı seçin, odaya katılın ve bas-konuş tuşunu ayarlayın. Doğrulanmış imza, dosyanın yayıncısını ve bütünlüğünü gösterir; yeni bir sürüm için Windows SmartScreen itibar uyarısının hemen kaybolmasını garanti etmez.
+İmzalı sürümler için GitHub **Releases** sayfasındaki `ClutchHub-Setup-<sürüm>.exe` dosyasını indirin. SignPath henüz yapılandırılmadıysa kurulum dosyası yalnızca ilgili GitHub Actions çalıştırmasının **clutchhub-unsigned** artifact'ında bulunur; bu dosya imzasızdır. Kurulum dosyasını çalıştırıp hedef klasörü seçebilirsiniz; masaüstü kısayolu oluşturulur. Uygulamayı açıp bir kullanıcı adı seçin, odaya katılın ve bas-konuş tuşunu ayarlayın. Doğrulanmış imza, dosyanın yayıncısını ve bütünlüğünü gösterir; yeni bir sürüm için Windows SmartScreen itibar uyarısının hemen kaybolmasını garanti etmez.
 
 ## Code signing policy
 
 Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
-Kaynak kodu ve release iş akışı herkese açıktır. Yalnızca bu deponun yetkili bakımcısı tarafından oluşturulan, incelenen ve sürümü `package.json` ile eşleşen Git tag'leri release sürecini başlatır. [Windows release iş akışı](.github/workflows/windows-release.yml) Windows üzerinde kaynak koddan build alır, SignPath'e imzalama isteği gönderir, uygulama ve bas-konuş yardımcısının imzalarını doğrular, ardından kurulum EXE'sini imzalatıp Authenticode doğrulamasından geçirir. GitHub Release'e yalnızca doğrulanmış imzalı kurulum dosyası yayımlanır. SignPath yapılandırması yoksa tag release'i başarısız olur ve imzasız kurulum yayımlanmaz.
+Kaynak kodu ve release iş akışı herkese açıktır. Yalnızca bu deponun yetkili bakımcısı tarafından oluşturulan, incelenen ve sürümü `package.json` ile eşleşen Git tag'leri release sürecini başlatır. [Windows release iş akışı](.github/workflows/windows-release.yml) Windows üzerinde kaynak koddan build alır ve imzasız kurulum dosyasını her zaman workflow artifact'ı olarak yükler. SignPath yapılandırması yoksa imzalama atlanır ve başarılı build sonunda imzasız artifact kalır; otomatik GitHub Release oluşturulmaz. SignPath yapılandırması varsa iş akışı uygulama ile bas-konuş yardımcısını imzalatır, imzalarını doğrular, kurulum EXE'sini yeniden oluşturup imzalatır ve Authenticode doğrulamasından sonra yalnızca imzalı kurulum dosyasını GitHub Release'e yayımlar.
 
 SignPath Foundation ile imzalama, Foundation'ın projeyi kabul etmesine ve gerekli kimlik/hesap yapılandırmasının tamamlanmasına bağlıdır. Bu depoda özel anahtar, sertifika, PFX veya API token tutulmaz. GitHub **Settings → Secrets and variables → Actions** alanında `SIGNPATH_API_TOKEN` secret'ı ve `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`, `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` değişkenleri tanımlanmalıdır. SignPath projesindeki artifact configuration, [artifact-configuration.xml](signpath/artifact-configuration.xml) ile uyumlu olmalıdır. İmzalama isteğinin SignPath tarafında ayrıca onaylanması gerekebilir.
 
-Sürüm yayınlamak için önce `package.json` sürümünü artırıp değişikliği `main` dalına gönderin; sonra aynı sürüm için `v<sürüm>` tag'ini gönderin. Örneğin 0.4.0 sürümü için:
+Sürüm yayınlamak için önce `package.json` sürümünü artırıp değişikliği `main` dalına gönderin; sonra aynı sürüm için `v<sürüm>` tag'ini gönderin. Örneğin 1.0.0 sürümü için:
 
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 Code signing, SmartScreen dosya itibarından farklıdır; geçerli Authenticode imzası tek başına itibar uyarısını kaldırmaz.

@@ -25,6 +25,9 @@ Thumbs.db
 *.p7b
 *.p7c
 *.p7m
+*.snk
+*.jks
+*.keystore
 signing-input/
 signed-app/
 signed/

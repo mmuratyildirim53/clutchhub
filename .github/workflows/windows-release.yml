@@ -45,7 +45,7 @@ jobs:
         run: |
           npm ci
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          dotnet publish native/Keys/Clutchub.Keys.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:Product=ClutchHub "-p:Version=$($version).0"
+          dotnet publish native/Keys/Clutchub.Keys.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:IncludeSourceRevisionInInformationalVersion=false -p:Product=ClutchHub "-p:Version=$($version).0"
           if (-not (Test-Path assets/clutchub.ico)) {
             & ./assets/create-icon.ps1
           }
@@ -83,9 +83,11 @@ jobs:
           path: ${{ steps.locate.outputs.installer }}
           if-no-files-found: error
 
-      - name: Require SignPath configuration for tagged releases
+      - name: Report unsigned build when SignPath is not configured
         if: startsWith(github.ref, 'refs/tags/') && env.SIGNPATH_CONFIGURED != 'true'
-        run: throw 'SignPath secret or variables are missing; no release was published.'
+        run: |
+          "## Unsigned Windows build" >> $env:GITHUB_STEP_SUMMARY
+          "SignPath is not configured. The unsigned installer is available as the **clutchhub-unsigned** workflow artifact. Signing was skipped; no signed GitHub Release was published." >> $env:GITHUB_STEP_SUMMARY
 
       - name: Stage app executables for SignPath
         if: env.SIGNPATH_CONFIGURED == 'true'
