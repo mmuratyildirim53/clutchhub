@@ -1,0 +1,179 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: .
+        shell: pwsh
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      SIGNPATH_CONFIGURED: ${{ secrets.SIGNPATH_API_TOKEN != '' && vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_PROJECT_SLUG != '' && vars.SIGNPATH_SIGNING_POLICY_SLUG != '' && vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("${{ github.ref_name }}" -ne "v$version") {
+            throw "Tag ${{ github.ref_name }} must match package.json version v$version"
+          }
+
+      - name: Install dependencies and build keyboard helper
+        run: |
+          npm ci
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          dotnet publish native/Keys/Clutchub.Keys.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:Product=ClutchHub "-p:Version=$($version).0"
+          if (-not (Test-Path assets/clutchub.ico)) {
+            & ./assets/create-icon.ps1
+          }
+          npm run check
+
+      - name: Build unsigned Windows installer
+        run: npm run package:win
+
+      - name: Locate unsigned installer and app executables
+        id: locate
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = Join-Path (Resolve-Path dist).Path "ClutchHub-Setup-$version.exe"
+          $appExe = Join-Path (Resolve-Path dist/win-unpacked).Path 'ClutchHub.exe'
+          $keyExe = Join-Path (Resolve-Path dist/win-unpacked).Path 'resources/keys/Clutchub.Keys.exe'
+          foreach ($file in @($installer, $appExe, $keyExe)) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing build output: $file" }
+          }
+          foreach ($file in @($appExe, $keyExe)) {
+            $metadata = (Get-Item -LiteralPath $file).VersionInfo
+            if ($metadata.ProductName -ne 'ClutchHub' -or $metadata.ProductVersion -ne "$version.0") {
+              throw "Unexpected product metadata on $file"
+            }
+          }
+          "installer=$installer" >> $env:GITHUB_OUTPUT
+          "appExe=$appExe" >> $env:GITHUB_OUTPUT
+          "keyExe=$keyExe" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Upload unsigned installer
+        id: upload-unsigned-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: clutchhub-unsigned
+          path: ${{ steps.locate.outputs.installer }}
+          if-no-files-found: error
+
+      - name: Require SignPath configuration for tagged releases
+        if: startsWith(github.ref, 'refs/tags/') && env.SIGNPATH_CONFIGURED != 'true'
+        run: throw 'SignPath secret or variables are missing; no release was published.'
+
+      - name: Stage app executables for SignPath
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        run: |
+          New-Item -ItemType Directory -Force signing-input | Out-Null
+          Copy-Item -LiteralPath '${{ steps.locate.outputs.appExe }}' -Destination signing-input/ClutchHub.exe
+          Copy-Item -LiteralPath '${{ steps.locate.outputs.keyExe }}' -Destination signing-input/Clutchub.Keys.exe
+
+      - name: Upload app executables for signing
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        id: upload-app-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: clutchhub-app-unsigned
+          path: signing-input/*.exe
+          if-no-files-found: error
+
+      - name: Sign app executables
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-app-artifact.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-app
+          parameters: |
+            productVersion: "${{ steps.locate.outputs.version }}.0"
+
+      - name: Verify signed app and rebuild installer
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        run: |
+          foreach ($pair in @(
+            @{ Name = 'ClutchHub.exe'; Destination = '${{ steps.locate.outputs.appExe }}' },
+            @{ Name = 'Clutchub.Keys.exe'; Destination = '${{ steps.locate.outputs.keyExe }}' }
+          )) {
+            $matches = @(Get-ChildItem signed-app -Recurse -File -Filter $pair.Name)
+            if ($matches.Count -ne 1) { throw "Expected one signed $($pair.Name), found $($matches.Count)" }
+            $signature = Get-AuthenticodeSignature -LiteralPath $matches[0].FullName
+            if ($signature.Status -ne 'Valid') { throw "Invalid signature on $($pair.Name): $($signature.Status)" }
+            Copy-Item -LiteralPath $matches[0].FullName -Destination $pair.Destination -Force
+          }
+          npx electron-builder --win nsis --prepackaged dist/win-unpacked
+          $installer = '${{ steps.locate.outputs.installer }}'
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw "Missing rebuilt installer: $installer" }
+
+      - name: Upload installer containing signed app
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        id: upload-final-unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: clutchhub-installer-unsigned
+          path: ${{ steps.locate.outputs.installer }}
+          if-no-files-found: error
+
+      - name: Sign Windows installer
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-final-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+          parameters: |
+            productVersion: "${{ steps.locate.outputs.version }}"
+
+      - name: Verify final Authenticode signature
+        if: env.SIGNPATH_CONFIGURED == 'true'
+        id: verified
+        run: |
+          $expected = "ClutchHub-Setup-${{ steps.locate.outputs.version }}.exe"
+          $matches = @(Get-ChildItem signed -Recurse -File -Filter $expected)
+          if ($matches.Count -ne 1) { throw "Expected one signed installer, found $($matches.Count)" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $matches[0].FullName
+          if ($signature.Status -ne 'Valid') { throw "Invalid installer signature: $($signature.Status)" }
+          Get-FileHash -Algorithm SHA256 -LiteralPath $matches[0].FullName | Format-List
+          "installer=$($matches[0].FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Publish signed installer to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && env.SIGNPATH_CONFIGURED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' '${{ steps.verified.outputs.installer }}' --verify-tag --title 'ClutchHub ${{ github.ref_name }}' --generate-notes

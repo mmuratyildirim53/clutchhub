@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paste this configuration into the SignPath project and use its slug in
+     SIGNPATH_ARTIFACT_CONFIGURATION_SLUG. GitHub upload-artifact creates a ZIP
+     whose root contains one or more EXE files at both signing stages. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="productVersion" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="*.exe" min-matches="1" max-matches="unbounded"
+             product-name="ClutchHub" product-version="${productVersion}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

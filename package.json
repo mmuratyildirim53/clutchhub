@@ -1,0 +1,54 @@
+{
+  "name": "clutchub-desktop",
+  "productName": "ClutchHub",
+  "version": "0.4.0",
+  "description": "ClutchHub Windows sesli sohbet istemcisi",
+  "main": "src/main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "package:win": "electron-builder --win nsis",
+    "build:win": "npm run package:win",
+    "package:win:signed": "powershell -ExecutionPolicy Bypass -File scripts/package-signed.ps1",
+    "check": "node --check src/main.cjs && node --check src/preload.cjs",
+    "test:e2e": "node tests/verify-desktop.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "playwright": "^1.63.0"
+  },
+  "build": {
+    "appId": "net.clutchub.desktop",
+    "productName": "ClutchHub",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "native/Keys/bin/Release/net9.0-windows/win-x64/publish",
+        "to": "keys",
+        "filter": [
+          "Clutchub.Keys.exe"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/clutchub.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "ClutchHub",
+      "artifactName": "ClutchHub-Setup-${version}.${ext}"
+    }
+  }
+}

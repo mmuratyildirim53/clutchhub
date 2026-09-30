@@ -1,0 +1,34 @@
+/* Desktop composition for the chosen four-card Windows design. */
+@media (min-width: 1000px) {
+  section[aria-label="Oda katılımcıları"] div:has(> [data-participant]) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 18px !important;
+    max-width: 1020px;
+  }
+  section[aria-label="Oda katılımcıları"] [data-participant] {
+    display: grid !important;
+    grid-template-columns: 104px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    column-gap: 20px !important;
+    align-content: center !important;
+    text-align: left !important;
+    min-height: 170px !important;
+    padding: 24px 30px !important;
+  }
+  section[aria-label="Oda katılımcıları"] [data-participant] > div:first-child {
+    grid-row: 1 / span 2;
+    width: 96px !important;
+    height: 96px !important;
+    margin: 0 !important;
+  }
+  section[aria-label="Oda katılımcıları"] [data-participant] > h3 {
+    align-self: end !important;
+    justify-self: start !important;
+    margin: 0 0 5px !important;
+  }
+  section[aria-label="Oda katılımcıları"] [data-participant] > p {
+    align-self: start !important;
+    justify-self: start !important;
+  }
+}
