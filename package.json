@@ -7,10 +7,11 @@
   "private": true,
   "scripts": {
     "start": "electron .",
+    "dev": "node scripts/start-dev.cjs",
     "package:win": "electron-builder --win nsis",
     "build:win": "npm run package:win",
     "package:win:signed": "powershell -ExecutionPolicy Bypass -File scripts/package-signed.ps1",
-    "check": "node --check src/main.cjs && node --check src/preload.cjs",
+    "check": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/config.cjs && node --test tests/config.test.cjs",
     "test:e2e": "node tests/verify-desktop.cjs"
   },
   "devDependencies": {

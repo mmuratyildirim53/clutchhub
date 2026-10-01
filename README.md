@@ -21,6 +21,8 @@ npm run check
 npm start
 ```
 
+`npm start` mevcut production sitesini açar. Yerel geliştirme için Next.js arayüzünü ve ona bağlı yerel API/LiveKit servislerini ayrıca başlatın; ardından `npm run dev` çalıştırın. Bu komut varsayılan olarak `http://localhost:3000` sitesini açar. Yerel arayüz başka porttaysa yalnızca yerel bir HTTP adresi olacak şekilde `CLUTCHUB_DEV_SITE_URL` ortam değişkenini ayarlayabilirsiniz. Yerel arayüzün API ve ses sunucusu bağlantıları da kendi geliştirme ortamında yapılandırılmalıdır. Paketlenen Windows EXE, geliştirme değişkenleri ayarlansa bile her zaman `https://clutchhub.net` adresini kullanır. Sunucu parolaları ve LiveKit özel anahtarları istemciye eklenmez.
+
 Kurulum paketi üretmek için `npm run build:win` çalıştırın. Çıktı `dist/ClutchHub-Setup-<sürüm>.exe` olur. Sürüm, `package.json` içindeki `version` alanından gelir. `native/Keys` yardımcısı önce yayımlanmış olmalıdır. Yerel build, geçerli bir kod imzalama sertifikası yapılandırılmadıkça **imzasızdır**. Mevcut yerel sertifika ile imzalama yöntemi için [IMZALAMA.md](IMZALAMA.md) ve `npm run package:win:signed` kullanılabilir.
 
 ## Windows kurulumu

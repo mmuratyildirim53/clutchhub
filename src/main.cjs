@@ -3,8 +3,9 @@ const { spawn } = require('node:child_process');
 const { createInterface } = require('node:readline');
 const fs = require('node:fs');
 const path = require('node:path');
+const { siteOrigin } = require('./config.cjs');
 
-const SITE = process.env.CLUTCHUB_E2E === '1' && process.env.CLUTCHUB_TEST_SITE ? process.env.CLUTCHUB_TEST_SITE : 'https://clutchhub.net';
+const SITE = siteOrigin({ isPackaged: app.isPackaged, env: process.env });
 // The query flag is deliberate: it makes the premium desktop shell independent
 // of renderer storage and keeps the ordinary browser page unchanged.
 const SITE_URL = `${SITE}/tr/room/great-hall?desktop=1`;
